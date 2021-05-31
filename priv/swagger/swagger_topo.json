@@ -4,7 +4,7 @@
     "/get_topo": {
       "get": {
         "basePath":"/",
-        "description": "获取产品组态",
+        "description": "云组态",
         "parameters": [
           {
             "description": "产品ObjectId",
@@ -31,44 +31,7 @@
             "description": ""
           }
         },
-        "summary": "获取产品组态",
-        "tags": [
-          "TOPO"
-        ]
-      }
-    },
-    "/konva_thing": {
-      "get": {
-        "basePath":"/",
-        "security": [],
-        "description": "物模型详情",
-        "parameters": [
-          {
-            "description": "产品ObjectId",
-            "in": "query",
-            "name": "productid",
-            "required": true,
-            "type": "string",
-            "default":""
-          },
-          {
-            "description": "shapeid",
-            "in": "query",
-            "name": "shapeid",
-            "required": true,
-            "type": "string",
-            "default":""
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "404": {
-            "description": ""
-          }
-        },
-        "summary": "物模型详情",
+        "summary": "云组态",
         "tags": [
           "TOPO"
         ]
@@ -78,7 +41,7 @@
       "post": {
         "basePath":"/",
         "security": [],
-        "description": "发送组态",
+        "description": "云组态",
         "consumes": [
           "*"
         ],
@@ -116,7 +79,7 @@
             "description": ""
           }
         },
-        "summary": "发送组态",
+        "summary": "云组态",
         "tags": [
           "TOPO"
         ]

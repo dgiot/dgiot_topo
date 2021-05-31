@@ -14,9 +14,11 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 -module(dgiot_topo_channel).
--behavior(shuwa_channelx).
+-behavior(dgiot_channelx).
 -define(TYPE, <<"DGIOTTOPO">>).
 -author("johnliu").
+-include_lib("dgiot/include/logger.hrl").
+
 -record(state, {id, env = #{}}).
 
 %% API
@@ -52,14 +54,13 @@
 }).
 
 start(ChannelId, ChannelArgs) ->
-    shuwa_channelx:add(?TYPE, ChannelId, ?MODULE, ChannelArgs#{
+    dgiot_channelx:add(?TYPE, ChannelId, ?MODULE, ChannelArgs#{
         <<"Size">> => 1
     }).
 
 %% 通道初始化
 init(?TYPE, ChannelId, #{<<"product">> := _Products} = ChannelArgs) ->
     NewEnv = get_newenv(ChannelArgs),
-%%    [{ProductId, App} | _] = get_app(Products),
     State = #state{
         id = ChannelId,
         env = NewEnv#{}
@@ -69,52 +70,39 @@ init(?TYPE, ChannelId, #{<<"product">> := _Products} = ChannelArgs) ->
 
 %% 初始化池子
 handle_init(State) ->
-    shuwa_mqtt:subscribe(<<"thing/topo/rest">>),
+    dgiot_mqtt:subscribe(<<"thing/topo/rest">>),
     {ok, State}.
 
 %% 通道消息处理,注意：进程池调用
 handle_event(EventId, Event, _State) ->
-    lager:info("channel ~p, ~p", [EventId, Event]),
+    ?LOG(info,"channel ~p, ~p", [EventId, Event]),
     ok.
 
 handle_message({deliver, _Topic, Msg}, State) ->
-    Payload = binary_to_term(shuwa_mqtt:get_payload(Msg)),
+    Payload = binary_to_term(dgiot_mqtt:get_payload(Msg)),
 
-    lager:info("Payload ~p", [Payload]),
+    ?LOG(info,"Payload ~p", [Payload]),
 
-    case binary:split(shuwa_mqtt:get_topic(Msg), <<$/>>, [global, trim]) of
+    case binary:split(dgiot_mqtt:get_topic(Msg), <<$/>>, [global, trim]) of
         [<<"thing">>, <<"topo">>, <<"rest">>] ->
-            shuwa_mqtt:subscribe(Payload);
+            dgiot_mqtt:subscribe(Payload);
         [<<"thing">>, ProductId, Devaddr, <<"post">>] ->
-            ProductId, Devaddr, #{<<"Arcerl">> => 1, <<"Flow">> => 1.2},
-            DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
+            DeviceId = dgiot_parse:get_deviceid(ProductId, Devaddr),
             Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
             Base64 = base64:encode(jsx:encode(Payload)),
-            shuwa_mqtt:publish(self(), Pubtopic, Base64);
+            dgiot_mqtt:publish(self(), Pubtopic, Base64);
         _ ->
             pass
     end,
     {ok, State};
 
 handle_message(Message, State) ->
-    lager:info("channel ~p", [Message]),
+    ?LOG(info,"channel ~p", [Message]),
     {ok, State}.
 
 stop(ChannelType, ChannelId, _State) ->
-    lager:info("channel stop ~p,~p", [ChannelType, ChannelId]),
+    ?LOG(info,"channel stop ~p,~p", [ChannelType, ChannelId]),
     ok.
-
-get_app(Products) ->
-    lists:map(fun({_ProdcutId, #{<<"ACL">> := Acl}}) ->
-        Predicate = fun(E) ->
-            case E of
-                <<"role:", _/binary>> -> true;
-                _ -> false
-            end
-                    end,
-        [<<"role:", _App/binary>> | _] = lists:filter(Predicate, maps:keys(Acl)),
-        {_ProdcutId, _App}
-              end, Products).
 
 get_newenv(Args) ->
     maps:without([

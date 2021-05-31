@@ -15,77 +15,43 @@
 %%--------------------------------------------------------------------
 -module(dgiot_topo).
 -author("johnliu").
+-include_lib("dgiot/include/logger.hrl").
 
--export([start_http/0, docroot/0, get_topo/2, send_topo/3, get_Product/0, get_name/3, put_topo/2, get_konva_thing/2]).
+-export([start_http/0, docroot/0, get_topo/2, send_topo/3, get_Product/0, get_name/3, put_topo/2]).
 
 start_http() ->
     Port = application:get_env(?MODULE, port, 6081),
     DocRoot = docroot(),
-    shuwa_http_server:start_http(?MODULE, Port, DocRoot).
+    dgiot_http_server:start_http(?MODULE, Port, DocRoot).
+
 
 docroot() ->
     {file, Here} = code:is_loaded(?MODULE),
     Dir = filename:dirname(filename:dirname(Here)),
-    Root = shuwa_httpc:url_join([Dir, "/priv/"]),
+    Root = dgiot_httpc:url_join([Dir, "/priv/"]),
     Root ++ "www".
+
+
 
 get_topo(Arg, _Context) ->
     #{<<"productid">> := ProductId,
         <<"devaddr">> := Devaddr
     } = Arg,
-    case shuwa_parse:get_object(<<"Product">>, ProductId) of
+    case dgiot_parse:get_object(<<"Product">>, ProductId) of
         {ok, #{<<"config">> := #{<<"konva">> := #{<<"Stage">> := #{<<"children">> := Children} = Stage} = Konva}}} when length(Children) > 0 ->
             case Devaddr of
                 undefined ->
-%%                    product
-%%                    Topic = <<"thing/", ProductId/binary, "/post">>,
-%%                    Base64 = base64:encode(jsx:encode(Konva)),
-%%                    shuwa_mqtt:publish(self(), Topic, Base64),
                     NewChildren1 = get_children(ProductId, Children, ProductId),
                     {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}};
                 _ ->
 %%                    device
-                    DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
-%%                    Topic = <<"thing/", DeviceId/binary, "/post">>,
-%%                    Base64 = base64:encode(jsx:encode(Konva#{<<"Shape">> := NewShape})),
-%%                    shuwa_mqtt:publish(self(), Topic, Base64),
+                    DeviceId = dgiot_parse:get_deviceid(ProductId, Devaddr),
                     NewChildren1 = get_children(ProductId, Children, DeviceId),
-                    {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}};
-                _ ->
-                    {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
+                    {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}}
             end;
         _ ->
             {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
-    end.
 
-get_konva_thing(Arg, _Context) ->
-    #{<<"productid">> := ProductId,
-        <<"shapeid">> := Shapeid
-    } = Arg,
-    case shuwa_parse:get_object(<<"Product">>, ProductId) of
-        {ok, #{<<"config">> := #{<<"konva">> := #{<<"Stage">> := #{<<"children">> := Children}}}, <<"thing">> := #{<<"properties">> := Properties}}} ->
-            put({self(), shapeids}, []),
-            get_children(ProductId, Children, ProductId),
-            Shapids = get({self(), shapeids}),
-            NewProperties =
-                lists:foldl(fun(Prop, Acc) ->
-                    Identifier = maps:get(<<"identifier">>, Prop),
-                    case lists:member(Identifier, Shapids) of
-                        false ->
-                            Acc#{<<"nobound">> => Acc ++ [Prop]};
-                        true ->
-                            Acc
-                    end,
-                    case Shapeid of
-                        Identifier ->
-                             [Prop];
-                        _ ->
-                            Acc
-                    end
-                            end, #{}, Properties),
-            {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"Data">> => #{<<"properties">> => NewProperties}}};
-        _ ->
-            {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
     end.
 
 get_children(ProductId, Children, DeviceId) ->
@@ -111,17 +77,13 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId) ->
         _ ->
             case ProductId of
                 DeviceId ->
-                    Id = maps:get(<<"id">>, Attrs),
-                    case get({self(), shapeids}) of
-                        undefined ->
-                            put({self(), shapeids}, [Id]);
-                        List ->
-                            put({self(), shapeids}, List ++ [Id])
-                    end,
-                    shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
+                    dgiot_data:insert({shapetype, dgiot_parse:get_shapeid(ProductId, maps:get(<<"id">>, Attrs))}, ClassName),
+%%                    Attrs#{<<"text">> => Text};
                     Attrs;
                 _ ->
-                    Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs))}
+%%                    Text = get_name(ProductId, maps:get(<<"id">>, Attrs), dgiot_utils:to_binary(maps:get(<<"text">>, Attrs))),
+%%                    Attrs#{<<"id">> => dgiot_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs)), <<"text">> => Text}
+                    Attrs#{<<"id">> => dgiot_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs))}
             end
     end.
 
@@ -141,62 +103,73 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId) ->
 %%                }
 %%        ]
 %%    }
-%%}  shuwa_data:get({product, <<"16cf2bf9f7energy">>})
+%%}  dgiot_data:get({product, <<"16cf2bf9f7energy">>})
 %% dgiot_topo:send_topo(<<"9b5c1a3ed5">>, <<"001">>, #{<<"Acrel">> => 10,<<"current">> => 20,<<"current">> => 30}).
 send_topo(ProductId, Devaddr, Payload) ->
-    DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
+    DeviceId = dgiot_parse:get_deviceid(ProductId, Devaddr),
     Shape =
         maps:fold(fun(K, V, Acc) ->
-            Text = get_name(ProductId, K, shuwa_utils:to_binary(V)),
+            Text = get_name(ProductId, K, dgiot_utils:to_binary(V)),
             Type =
-                case shuwa_data:get({shapetype, shuwa_parse:get_shapeid(ProductId, K)}) of
+                case dgiot_data:get({shapetype, dgiot_parse:get_shapeid(ProductId, K)}) of
                     not_find ->
                         <<"text">>;
                     Type1 ->
                         Type1
                 end,
-            Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => Text, <<"type">> => Type}]
+            Acc ++ [#{<<"id">> => dgiot_parse:get_shapeid(DeviceId, K), <<"text">> => Text, <<"type">> => Type}]
                   end, [], Payload),
     Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
     Base64 = base64:encode(jsx:encode(#{<<"konva">> => Shape})),
-    shuwa_mqtt:publish(self(), Pubtopic, Base64).
+    dgiot_mqtt:publish(self(), Pubtopic, Base64).
+
 
 put_topo(Arg, _Context) ->
     #{<<"productid">> := ProductId,
         <<"devaddr">> := Devaddr,
         <<"base64">> := Base64
     } = Arg,
-    DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
+    DeviceId = dgiot_parse:get_deviceid(ProductId, Devaddr),
     Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
-    shuwa_mqtt:publish(self(), Pubtopic, Base64),
+    dgiot_mqtt:publish(self(), Pubtopic, Base64),
     {ok, <<"Success">>}.
 
 get_name(ProductId, K, V) ->
-    case shuwa_data:get({product, <<ProductId/binary, K/binary>>}) of
+    case dgiot_data:get({product, <<ProductId/binary, K/binary>>}) of
         not_find ->
             V;
-        {Name, Type, Unit} when Type =:= <<"float">> orelse Type =:= <<"double">> ->
-            NewV = shuwa_utils:to_binary(shuwa_utils:to_float(V, 3)),
+        {Name, Type, Unit} when Type =:= <<"float">> ->
+            NewV = dgiot_utils:to_binary(dgiot_utils:to_float(V, 3)),
             <<Name/binary, ": ", NewV/binary, " ", Unit/binary>>;
         {Name, _Type, Unit} ->
-            <<Name/binary, ":", V/binary, " ", Unit/binary>>
+            %todo 物模型配置错误，临时规避一下
+            NewV = dgiot_utils:to_binary(dgiot_utils:to_float(V / 1.0, 3)),
+            <<Name/binary, ":", NewV/binary, " ", Unit/binary>>
     end.
 
 get_Product() ->
-    case shuwa_parse:query_object(<<"Product">>, #{<<"skip">> => 0}) of
+    case dgiot_parse:query_object(<<"Product">>, #{<<"skip">> => 0}) of
         {ok, #{<<"results">> := Results}} ->
             lists:foldl(fun(X, _Acc) ->
                 case X of
                     #{<<"objectId">> := ProductId, <<"config">> := #{<<"konva">> := #{<<"Stage">> := #{<<"children">> := Children}}}, <<"thing">> := #{<<"properties">> := Properties}} ->
                         lists:map(fun(P) ->
+%%                            "dataType": {
+%%                                "type": "float",
+%%                                "specs": {
+%%                                    "max": 500,
+%%                                    "min": -500,
+%%                                    "step": 0.1,
+%%                                    "unit": "MPa"
+%%                                }
+%%                            },
                             DataType = maps:get(<<"dataType">>, P),
                             Type = maps:get(<<"type">>, DataType),
                             Specs = maps:get(<<"specs">>, DataType),
                             Unit = maps:get(<<"unit">>, Specs, <<"">>),
                             Identifier = maps:get(<<"identifier">>, P),
                             Name = maps:get(<<"name">>, P),
-                            shuwa_data:insert({product, <<ProductId/binary, Identifier/binary>>}, {Name, Type, Unit}),
-                            shuwa_data:insert({thing, <<ProductId/binary, Identifier/binary>>}, P)
+                            dgiot_data:insert({product, <<ProductId/binary, Identifier/binary>>}, {Name, Type, Unit})
                                   end, Properties),
                         get_children(ProductId, Children, ProductId);
                     _ ->
