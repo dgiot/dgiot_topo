@@ -37,22 +37,12 @@ get_topo(Arg, _Context) ->
         {ok, #{<<"config">> := #{<<"konva">> := #{<<"Stage">> := #{<<"children">> := Children} = Stage} = Konva}}} when length(Children) > 0 ->
             case Devaddr of
                 undefined ->
-%%                    product
-%%                    Topic = <<"thing/", ProductId/binary, "/post">>,
-%%                    Base64 = base64:encode(jsx:encode(Konva)),
-%%                    shuwa_mqtt:publish(self(), Topic, Base64),
                     NewChildren1 = get_children(ProductId, Children, ProductId),
                     {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}};
                 _ ->
-%%                    device
                     DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
-%%                    Topic = <<"thing/", DeviceId/binary, "/post">>,
-%%                    Base64 = base64:encode(jsx:encode(Konva#{<<"Shape">> := NewShape})),
-%%                    shuwa_mqtt:publish(self(), Topic, Base64),
                     NewChildren1 = get_children(ProductId, Children, DeviceId),
-                    {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}};
-                _ ->
-                    {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
+                    {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}}
             end;
         _ ->
             {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
@@ -67,23 +57,27 @@ get_konva_thing(Arg, _Context) ->
             put({self(), shapeids}, []),
             get_children(ProductId, Children, ProductId),
             Shapids = get({self(), shapeids}),
-            NewProperties =
+            Nobound =
                 lists:foldl(fun(Prop, Acc) ->
                     Identifier = maps:get(<<"identifier">>, Prop),
                     case lists:member(Identifier, Shapids) of
                         false ->
-                            Acc#{<<"nobound">> => Acc ++ [Prop]};
+                            Acc ++ [Prop];
                         true ->
                             Acc
-                    end,
+                    end
+                            end, [], Properties),
+            KonvaThing =
+                lists:foldl(fun(Prop, Acc) ->
+                    Identifier = maps:get(<<"identifier">>, Prop),
                     case Shapeid of
                         Identifier ->
-                             [Prop];
+                            Prop;
                         _ ->
                             Acc
                     end
                             end, #{}, Properties),
-            {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"Data">> => #{<<"properties">> => NewProperties}}};
+            {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => #{<<"nobound">> => Nobound, <<"konvathing">> => KonvaThing}}};
         _ ->
             {ok, #{<<"code">> => 204, <<"message">> => <<"没有组态"/utf8>>}}
     end.

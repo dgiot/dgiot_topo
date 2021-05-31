@@ -40,7 +40,6 @@
     "/konva_thing": {
       "get": {
         "basePath":"/",
-        "security": [],
         "description": "物模型详情",
         "parameters": [
           {
