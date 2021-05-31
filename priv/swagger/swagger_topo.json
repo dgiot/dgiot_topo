@@ -1,0 +1,132 @@
+{
+  "definitions": {},
+  "paths": {
+    "/get_topo": {
+      "get": {
+        "basePath":"/",
+        "description": "获取产品组态",
+        "parameters": [
+          {
+            "description": "产品ObjectId",
+            "in": "query",
+            "name": "productid",
+            "required": true,
+            "type": "string",
+            "default":""
+          },
+          {
+            "description": "设备编号",
+            "in": "query",
+            "name": "devaddr",
+            "required": false,
+            "type": "string",
+            "default":""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "summary": "获取产品组态",
+        "tags": [
+          "TOPO"
+        ]
+      }
+    },
+    "/konva_thing": {
+      "get": {
+        "basePath":"/",
+        "security": [],
+        "description": "物模型详情",
+        "parameters": [
+          {
+            "description": "产品ObjectId",
+            "in": "query",
+            "name": "productid",
+            "required": true,
+            "type": "string",
+            "default":""
+          },
+          {
+            "description": "shapeid",
+            "in": "query",
+            "name": "shapeid",
+            "required": true,
+            "type": "string",
+            "default":""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "summary": "物模型详情",
+        "tags": [
+          "TOPO"
+        ]
+      }
+    },
+    "/send_topo": {
+      "post": {
+        "basePath":"/",
+        "security": [],
+        "description": "发送组态",
+        "consumes": [
+          "*"
+        ],
+        "parameters": [
+          {
+            "description": "产品ObjectId",
+            "in": "body",
+            "name": "productid",
+            "required": true,
+            "type": "string",
+            "default":""
+          },
+          {
+            "description": "设备编号",
+            "in": "body",
+            "name": "devaddr",
+            "required": true,
+            "type": "string",
+            "default":""
+          },
+          {
+            "description": "base64",
+            "in": "body",
+            "name": "base64",
+            "required": true,
+            "type": "string",
+            "default":""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "summary": "发送组态",
+        "tags": [
+          "TOPO"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "TOPO",
+      "description": "云组态"
+    }
+  ]
+}
