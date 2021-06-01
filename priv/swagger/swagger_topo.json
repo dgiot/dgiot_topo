@@ -1,9 +1,9 @@
 {
   "definitions": {},
   "paths": {
-    "/get_topo": {
+    "/topo": {
       "get": {
-        "basePath":"/",
+        "basePath": "/",
         "description": "获取产品组态",
         "parameters": [
           {
@@ -12,7 +12,7 @@
             "name": "productid",
             "required": true,
             "type": "string",
-            "default":""
+            "default": ""
           },
           {
             "description": "设备编号",
@@ -20,7 +20,7 @@
             "name": "devaddr",
             "required": false,
             "type": "string",
-            "default":""
+            "default": ""
           }
         ],
         "responses": {
@@ -35,11 +35,57 @@
         "tags": [
           "TOPO"
         ]
+      },
+      "post": {
+        "basePath": "/",
+        "security": [],
+        "description": "发送组态",
+        "consumes": [
+          "*"
+        ],
+        "parameters": [
+          {
+            "description": "产品ObjectId",
+            "in": "body",
+            "name": "productid",
+            "required": true,
+            "type": "string",
+            "default": ""
+          },
+          {
+            "description": "设备编号",
+            "in": "body",
+            "name": "devaddr",
+            "required": true,
+            "type": "string",
+            "default": ""
+          },
+          {
+            "description": "base64",
+            "in": "body",
+            "name": "base64",
+            "required": true,
+            "type": "string",
+            "default": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "summary": "发送组态",
+        "tags": [
+          "TOPO"
+        ]
       }
     },
     "/konva_thing": {
       "get": {
-        "basePath":"/",
+        "basePath": "/",
         "description": "物模型详情",
         "parameters": [
           {
@@ -48,7 +94,7 @@
             "name": "productid",
             "required": true,
             "type": "string",
-            "default":""
+            "default": ""
           },
           {
             "description": "shapeid",
@@ -56,7 +102,7 @@
             "name": "shapeid",
             "required": true,
             "type": "string",
-            "default":""
+            "default": ""
           }
         ],
         "responses": {
@@ -71,40 +117,33 @@
         "tags": [
           "TOPO"
         ]
-      }
-    },
-    "/send_topo": {
+      },
       "post": {
-        "basePath":"/",
-        "security": [],
-        "description": "发送组态",
-        "consumes": [
-          "*"
-        ],
+        "basePath": "/",
+        "description": "修改组态",
         "parameters": [
           {
-            "description": "产品ObjectId",
             "in": "body",
-            "name": "productid",
+            "name": "data",
+            "description": "修改组态",
             "required": true,
-            "type": "string",
-            "default":""
-          },
-          {
-            "description": "设备编号",
-            "in": "body",
-            "name": "devaddr",
-            "required": true,
-            "type": "string",
-            "default":""
-          },
-          {
-            "description": "base64",
-            "in": "body",
-            "name": "base64",
-            "required": true,
-            "type": "string",
-            "default":""
+            "schema": {
+              "type": "object",
+              "properties": {
+                "productid": {
+                  "type": "string"
+                },
+                "shapeid": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -115,7 +154,7 @@
             "description": ""
           }
         },
-        "summary": "发送组态",
+        "summary": "组态修改",
         "tags": [
           "TOPO"
         ]

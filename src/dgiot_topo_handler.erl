@@ -75,7 +75,7 @@ handle(OperationID, Args, Context, Req) ->
 %%% 内部函数 Version:API版本
 %%%===================================================================
 
-%% topo 概要: 组态
+%% topo 概要: 获取组态
 %% OperationId:topo
 %% 请求:GET topo
 do_request(get_topo, Arg, Context, _Req) ->
@@ -87,11 +87,10 @@ do_request(get_topo, Arg, Context, _Req) ->
     end;
 
 
-%% topo 概要: 组态
+%% topo 概要: 发送组态数据
 %% OperationId:topo
 %% 请求:post post_send_topo
-do_request(post_send_topo, Arg, Context, _Req) ->
-    lager:info("Arg ~p", [Arg]),
+do_request(post_topo, Arg, Context, _Req) ->
     case dgiot_topo:put_topo(Arg, Context) of
         {ok, Success} ->
             {ok, Success};
@@ -99,11 +98,22 @@ do_request(post_send_topo, Arg, Context, _Req) ->
             {400, Reason}
     end;
 
-%% topo 概要: 组态
+%% topo 概要: 获取组态物模型详情
 %% OperationId:topo
-%% 请求:post post_send_topo
+%% 请求:post get_konva_thing
 do_request(get_konva_thing, Arg, Context, _Req) ->
     case dgiot_topo:get_konva_thing(Arg, Context) of
+        {ok, Success} ->
+            {ok, Success};
+        {error, Reason} ->
+            {400, Reason}
+    end;
+
+%% topo 概要: 修改组态
+%% OperationId:topo
+%% 请求:post post_send_topo
+do_request(post_konva_thing, Arg, Context, _Req) ->
+    case dgiot_topo:edit_konva(Arg, Context) of
         {ok, Success} ->
             {ok, Success};
         {error, Reason} ->
