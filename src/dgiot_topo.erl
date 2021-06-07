@@ -148,7 +148,7 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId, KonvatId, Shapeid, Identifier, 
                             shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
                             Attrs;
                         _ ->
-                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs)), <<"draggable">> => false}
+                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs)), <<"text">> => <<"0">>,<<"draggable">> => false}
                     end
             end
     end.
@@ -216,7 +216,8 @@ send_topo(ProductId, DeviceId, Payload) ->
                     {_, _, Unit1} ->
                         Unit1
                 end,
-            Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => <<V/binary, " ", Unit/binary>>, <<"type">> => Type}]
+            BinV = shuwa_utils:to_binary(V),
+            Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => <<BinV/binary, " ", Unit/binary>>, <<"type">> => Type}]
                   end, [], Payload),
     Base64 = base64:encode(jsx:encode(#{<<"konva">> => Shape})),
     Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
