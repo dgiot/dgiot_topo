@@ -148,46 +148,10 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId, KonvatId, Shapeid, Identifier, 
                             shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
                             Attrs;
                         _ ->
-                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs))}
+                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs)), <<"draggable">> => false}
                     end
             end
     end.
-
-%% #{<<"Arcel">>=> 1,<<"Flow">> => 1.2} => ShapeId = md5(<<DeviceId/binary,"Arcel">>)
-%%{
-%%"konva":{
-%%    [
-%%                {
-%%                "id":[shapeid],
-%%                "text":"16",
-%%                "type":"text",
-%%                },
-%%                {
-%%                "id":[shapeid],
-%%                "text":"16",
-%%                "type":"Image",
-%%                }
-%%        ]
-%%    }
-%%}  shuwa_data:get({product, <<"16cf2bf9f7energy">>})
-%% dgiot_topo:send_topo(<<"9b5c1a3ed5">>, <<"001">>, #{<<"Acrel">> => 10,<<"current">> => 20,<<"current">> => 30}).
-send_topo(ProductId, Devaddr, Payload) ->
-    DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
-    Shape =
-        maps:fold(fun(K, V, Acc) ->
-            Text = get_name(ProductId, K, shuwa_utils:to_binary(V)),
-            Type =
-                case shuwa_data:get({shapetype, shuwa_parse:get_shapeid(ProductId, K)}) of
-                    not_find ->
-                        <<"text">>;
-                    Type1 ->
-                        Type1
-                end,
-            Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => Text, <<"type">> => Type}]
-                  end, [], Payload),
-    Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
-    Base64 = base64:encode(jsx:encode(#{<<"konva">> => Shape})),
-    shuwa_mqtt:publish(self(), Pubtopic, Base64).
 
 put_topo(Arg, _Context) ->
     #{<<"productid">> := ProductId,
@@ -235,3 +199,25 @@ get_Product() ->
             pass
     end.
 
+send_topo(ProductId, DeviceId, Payload) ->
+    Shape =
+        maps:fold(fun(K, V, Acc) ->
+            Type =
+                case shuwa_data:get({shapetype, shuwa_parse:get_shapeid(ProductId, K)}) of
+                    not_find ->
+                        <<"text">>;
+                    Type1 ->
+                        Type1
+                end,
+            Unit =
+                case shuwa_data:get({product, <<ProductId/binary, K/binary>>}) of
+                    not_find ->
+                        <<>>;
+                    {_, _, Unit1} ->
+                        Unit1
+                end,
+            Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => <<V/binary, " ", Unit/binary>>, <<"type">> => Type}]
+                  end, [], Payload),
+    Base64 = base64:encode(jsx:encode(#{<<"konva">> => Shape})),
+    Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
+    shuwa_mqtt:publish(self(), Pubtopic, Base64).
