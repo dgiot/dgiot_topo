@@ -60,7 +60,7 @@ handle(OperationID, Args, Context, Req) ->
             lager:debug("do request: ~p, ~p ->ok ~n", [OperationID, Args]),
             {200, Headers, #{}, Req};
         {ok, Res} ->
-            lager:info("do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),
+%%            lager:info("do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),
             {200, Headers, Res, Req};
         {Status, Res} ->
             lager:info("do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),

@@ -29,6 +29,17 @@ docroot() ->
     Root = shuwa_httpc:url_join([Dir, "/priv/"]),
     Root ++ "www".
 
+
+%%{ok,#{<<"results">> =>
+%%[#{<<"battery_voltage">> => 11.7,<<"charge_current">> => 0,
+%%<<"core_temperature">> => 37,
+%%<<"createdat">> => <<"2021-06-07 18:49:42.061">>,
+%%<<"day_electricity">> => 0.11,<<"dump_energy">> => 75.0,
+%%<<"i_out">> => 0.0,<<"outside_temperature">> => 25,
+%%<<"system_state">> => <<"0">>,<<"total_power">> => 2.1,
+%%<<"v_out">> => 0.0,<<"v_solarpanel">> => 0.3}]}}
+
+
 get_topo(Arg, _Context) ->
     #{<<"productid">> := ProductId,
         <<"devaddr">> := Devaddr
@@ -41,6 +52,12 @@ get_topo(Arg, _Context) ->
                     {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}};
                 _ ->
                     DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
+                    case shuwa_tdengine:get_device(ProductId, Devaddr, #{<<"keys">> => <<"last_row(*)">>, <<"limit">> => 1}) of
+                        {ok, #{<<"results">> := [Result | _]}} ->
+                            put({self(), td}, Result);
+                        _ ->
+                            put({self(), td}, #{})
+                    end,
                     NewChildren1 = get_children(ProductId, Children, DeviceId, <<"KonvatId">>, <<"Shapeid">>, <<"Identifier">>, <<"Name">>),
                     {ok, #{<<"code">> => 200, <<"message">> => <<"SUCCESS">>, <<"data">> => Konva#{<<"Stage">> => Stage#{<<"children">> => NewChildren1}}}}
             end;
@@ -148,9 +165,28 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId, KonvatId, Shapeid, Identifier, 
                             shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
                             Attrs;
                         _ ->
-                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs)), <<"text">> => <<"0">>,<<"draggable">> => false}
+                            Id = maps:get(<<"id">>, Attrs),
+                            Result = get({self(), td}),
+                            Text =
+                                case maps:find(Id, Result) of
+                                    error ->
+                                        <<"0">>;
+                                    {ok, Text1} ->
+                                        shuwa_utils:to_binary(Text1)
+                                end,
+                            Unit = get_unit(ProductId, Id),
+
+                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, Id), <<"text">> => <<Text/binary, " ", Unit/binary>>, <<"draggable">> => false}
                     end
             end
+    end.
+
+get_unit(ProductId, Id) ->
+    case shuwa_data:get({product, <<ProductId/binary, Id/binary>>}) of
+        not_find ->
+            <<>>;
+        {_, _, Unit1} ->
+            Unit1
     end.
 
 put_topo(Arg, _Context) ->
@@ -209,13 +245,7 @@ send_topo(ProductId, DeviceId, Payload) ->
                     Type1 ->
                         Type1
                 end,
-            Unit =
-                case shuwa_data:get({product, <<ProductId/binary, K/binary>>}) of
-                    not_find ->
-                        <<>>;
-                    {_, _, Unit1} ->
-                        Unit1
-                end,
+            Unit = get_unit(ProductId, K),
             BinV = shuwa_utils:to_binary(V),
             Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => <<BinV/binary, " ", Unit/binary>>, <<"type">> => Type}]
                   end, [], Payload),
