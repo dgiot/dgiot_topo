@@ -126,26 +126,30 @@ get_attrs(ProductId, ClassName, Attrs, DeviceId, KonvatId, Shapeid, Identifier, 
         <<"Group">> ->
             Attrs;
         _ ->
-            Id = maps:get(<<"id">>, Attrs),
-            case ProductId of
-                KonvatId ->
-                    case Id of
-                        Shapeid ->
-                            Attrs#{<<"id">> => Identifier, <<"text">> => Name};
-                        _ ->
-                            Attrs
-                    end;
-                DeviceId ->
-                    case get({self(), shapeids}) of
-                        undefined ->
-                            put({self(), shapeids}, [Id]);
-                        List ->
-                            put({self(), shapeids}, List ++ [Id])
-                    end,
-                    shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
+            case maps:find(<<"id">>, Attrs) of
+                error ->
                     Attrs;
-                _ ->
-                    Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs))}
+                {ok, Id} ->
+                    case ProductId of
+                        KonvatId ->
+                            case Id of
+                                Shapeid ->
+                                    Attrs#{<<"id">> => Identifier, <<"text">> => Name};
+                                _ ->
+                                    Attrs
+                            end;
+                        DeviceId ->
+                            case get({self(), shapeids}) of
+                                undefined ->
+                                    put({self(), shapeids}, [Id]);
+                                List ->
+                                    put({self(), shapeids}, List ++ [Id])
+                            end,
+                            shuwa_data:insert({shapetype, shuwa_parse:get_shapeid(ProductId, Id)}, ClassName),
+                            Attrs;
+                        _ ->
+                            Attrs#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, maps:get(<<"id">>, Attrs))}
+                    end
             end
     end.
 
