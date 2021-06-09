@@ -57,19 +57,18 @@ start(ChannelId, ChannelArgs) ->
     }).
 
 %% 通道初始化
-init(?TYPE, ChannelId, #{<<"product">> := _Products} = ChannelArgs) ->
+init(?TYPE, ChannelId, #{<<"product">> := Products} = ChannelArgs) ->
     NewEnv = get_newenv(ChannelArgs),
-%%    [{ProductId, App} | _] = get_app(Products),
     State = #state{
         id = ChannelId,
-        env = NewEnv#{}
+        env = NewEnv#{productids => get_prodcutids(Products)}
     },
     dgiot_topo:get_Product(),
     {ok, State}.
 
 %% 初始化池子
-handle_init(State) ->
-    shuwa_mqtt:subscribe(<<"thing/topo/rest">>),
+handle_init(#state{env = #{productids := ProductIds}} = State) ->
+    [shuwa_mqtt:subscribe(<<"topo/", ProductId/binary, "/#">>) || ProductId <- ProductIds],
     {ok, State}.
 
 %% 通道消息处理,注意：进程池调用
@@ -77,21 +76,18 @@ handle_event(EventId, Event, _State) ->
     lager:info("channel ~p, ~p", [EventId, Event]),
     ok.
 
-handle_message({deliver, _Topic, Msg}, State) ->
-    Payload = binary_to_term(shuwa_mqtt:get_payload(Msg)),
-
-    lager:info("Payload ~p", [Payload]),
-
+handle_message({deliver, _Topic, Msg}, #state{id = ChannelId} = State) ->
+    Payload = shuwa_mqtt:get_payload(Msg),
+    shuwa_bridge:send_log(ChannelId, "Topic ~p DTU revice from  ~p", [shuwa_mqtt:get_topic(Msg), shuwa_utils:binary_to_hex(Payload)]),
     case binary:split(shuwa_mqtt:get_topic(Msg), <<$/>>, [global, trim]) of
-        [<<"thing">>, <<"topo">>, <<"rest">>] ->
-            shuwa_mqtt:subscribe(Payload);
-        [<<"thing">>, ProductId, Devaddr, <<"post">>] ->
-            ProductId, Devaddr, #{<<"Arcerl">> => 1, <<"Flow">> => 1.2},
-            DeviceId = shuwa_parse:get_deviceid(ProductId, Devaddr),
-            Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
-            Base64 = base64:encode(jsx:encode(Payload)),
-            shuwa_mqtt:publish(self(), Pubtopic, Base64);
-        _ ->
+%%接收task汇聚过来的整个dtu物模型采集的数据 发送组态
+        [<<"topo">>, ProductId, DtuAddr, <<"post">>] ->
+            Data = jsx:decode(Payload, [{labels, binary}, return_maps]),
+            DeviceId = shuwa_parse:get_deviceid(ProductId, DtuAddr),
+            Thingdata = maps:get(<<"thingdata">>, Data, #{}),
+            dgiot_topo:send_topo(ProductId, DeviceId, Thingdata);
+        Other ->
+            lager:info("Other ~p", [Other]),
             pass
     end,
     {ok, State};
@@ -104,17 +100,10 @@ stop(ChannelType, ChannelId, _State) ->
     lager:info("channel stop ~p,~p", [ChannelType, ChannelId]),
     ok.
 
-get_app(Products) ->
-    lists:map(fun({_ProdcutId, #{<<"ACL">> := Acl}}) ->
-        Predicate = fun(E) ->
-            case E of
-                <<"role:", _/binary>> -> true;
-                _ -> false
-            end
-                    end,
-        [<<"role:", _App/binary>> | _] = lists:filter(Predicate, maps:keys(Acl)),
-        {_ProdcutId, _App}
-              end, Products).
+get_prodcutids(Products) ->
+    lists:foldl(fun({ProdcutId, _}, Acc) ->
+        Acc ++ [ProdcutId]
+                end, [], Products).
 
 get_newenv(Args) ->
     maps:without([
