@@ -30,8 +30,8 @@
 
 start(_StartType, _StartArgs) ->
     {ok, Sup} = dgiot_topo_sup:start_link(),
-    Spec =  dgiot_topo:start_http(),
-    {ok, _} = supervisor:start_child(Sup, Spec),
+%%    Spec =  dgiot_topo:start_http(),
+%%    {ok, _} = supervisor:start_child(Sup, Spec),
     {ok, Sup}.
 
 stop(_State) ->
