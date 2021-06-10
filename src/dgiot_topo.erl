@@ -16,7 +16,7 @@
 -module(dgiot_topo).
 -author("johnliu").
 
--export([start_http/0, docroot/0, get_topo/2, send_topo/3, get_Product/0, get_name/3, put_topo/2, get_konva_thing/2, edit_konva/2]).
+-export([start_http/0, docroot/0, get_topo/2, send_topo/3, get_Product/0, get_name/3, put_topo/2, get_konva_thing/2, edit_konva/2, push/4]).
 
 start_http() ->
     Port = application:get_env(?MODULE, port, 6081),
@@ -236,6 +236,12 @@ get_Product() ->
     end.
 
 send_topo(ProductId, DeviceId, Payload) ->
+    Base64 = get_optshape(ProductId, DeviceId, Payload),
+    Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
+    shuwa_mqtt:publish(self(), Pubtopic, Base64).
+
+
+get_optshape(ProductId, DeviceId, Payload) ->
     Shape =
         maps:fold(fun(K, V, Acc) ->
             Type =
@@ -249,6 +255,13 @@ send_topo(ProductId, DeviceId, Payload) ->
             BinV = shuwa_utils:to_binary(V),
             Acc ++ [#{<<"id">> => shuwa_parse:get_shapeid(DeviceId, K), <<"text">> => <<BinV/binary, " ", Unit/binary>>, <<"type">> => Type}]
                   end, [], Payload),
-    Base64 = base64:encode(jsx:encode(#{<<"konva">> => Shape})),
-    Pubtopic = <<"thing/", DeviceId/binary, "/post">>,
-    shuwa_mqtt:publish(self(), Pubtopic, Base64).
+    base64:encode(jsx:encode(#{<<"konva">> => Shape})).
+
+push(ProductId, Devaddr, DeviceId, Payload) ->
+    Base64 = get_optshape(ProductId, DeviceId, Payload),
+    Url = shuwa_data:get(topourl),
+    Url1 = shuwa_utils:to_list(Url),
+    Data = #{<<"productid">> => ProductId, <<"devaddr">> => Devaddr, <<"base64">> => Base64},
+    Data1 = shuwa_utils:to_list(jsx:encode(Data)),
+    httpc:request(post, {Url1, [], "application/json", Data1}, [], []).
+

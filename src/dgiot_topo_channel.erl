@@ -48,6 +48,18 @@
         description => #{
             zh => <<"DGIOT厂商"/utf8>>
         }
+    },
+    <<"BRIDGEURL">> => #{
+        order => 1,
+        type => string,
+        required => true,
+        default => <<"http://127.0.0.1:5080"/utf8>>,
+        title => #{
+            zh => <<"桥接地址"/utf8>>
+        },
+        description => #{
+            zh => <<"桥接地址"/utf8>>
+        }
     }
 }).
 
@@ -57,12 +69,13 @@ start(ChannelId, ChannelArgs) ->
     }).
 
 %% 通道初始化
-init(?TYPE, ChannelId, #{<<"product">> := Products} = ChannelArgs) ->
+init(?TYPE, ChannelId, #{<<"product">> := Products, <<"BRIDGEURL">> := Bridgeurl} = ChannelArgs) ->
     NewEnv = get_newenv(ChannelArgs),
     State = #state{
         id = ChannelId,
         env = NewEnv#{productids => get_prodcutids(Products)}
     },
+    shuwa_data:insert(topourl, <<Bridgeurl/binary, "/iotapi/send_topo">>),
     dgiot_topo:get_Product(),
     {ok, State}.
 
