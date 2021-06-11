@@ -120,6 +120,10 @@ do_request(post_konva_thing, Arg, Context, _Req) ->
             {400, Reason}
     end;
 
+do_request(post_dashboard, Arg, Context, _Req) ->
+    dgiot_dashboard:post_dashboard(Arg, Context),
+    {200, <<"success">>};
+
 
 %%  服务器不支持的API接口
 do_request(_OperationId, _Args, _Context, _Req) ->
