@@ -75,7 +75,7 @@ init(?TYPE, ChannelId, #{<<"product">> := Products, <<"BRIDGEURL">> := Bridgeurl
         id = ChannelId,
         env = NewEnv#{productids => get_prodcutids(Products)}
     },
-    shuwa_data:insert(topourl, <<Bridgeurl/binary, "/iotapi/send_topo">>),
+    shuwa_data:insert(topourl, <<Bridgeurl/binary, "/iotapi/topo">>),
     dgiot_topo:get_Product(),
     {ok, State}.
 
