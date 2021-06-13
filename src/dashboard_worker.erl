@@ -19,24 +19,20 @@
 -export([init/1, handle_call/3, handle_cast/2,
     handle_info/2, terminate/2, code_change/3, stop/1]).
 
--record(task, {oldque = [], newque = [], freq = 0, heart = 0}).
 %%%===================================================================
 %%% API
 %%%===================================================================
+
 start_link(#{<<"sessionToken">> := SessionToken} = State) ->
-    lager:info("State ~p", [State]),
     case shuwa_data:lookup({dashboard, SessionToken}) of
         {ok, Pid} when is_pid(Pid) ->
             case is_process_alive(Pid) of
                 true ->
-                    lager:info("State ~p", [State]),
                     ok;
                 false ->
-                    lager:info("State ~p", [State]),
                     gen_server:start_link(?MODULE, [State], [])
             end;
         _Reason ->
-            lager:info("State ~p", [State]),
             gen_server:start_link(?MODULE, [State], [])
     end;
 
@@ -57,7 +53,6 @@ stop(#{<<"sessionToken">> := SessionToken}) ->
 %%%===================================================================
 init([#{<<"data">> := Que, <<"sessionToken">> := SessionToken}]) ->
     shuwa_data:insert({dashboard, SessionToken}, self()),
-    lager:info("Que ~p", [Que]),
     case length(Que) of
         0 ->
             erlang:send_after(300, self(), stop);
@@ -67,7 +62,7 @@ init([#{<<"data">> := Que, <<"sessionToken">> := SessionToken}]) ->
             erlang:send_after(30 * 1000, self(), heart),
             erlang:send_after(1000, self(), retry)
     end,
-    {ok, #task{oldque = Que, newque = Que, freq = 1}};
+    {ok, #task{oldque = Que, newque = Que, freq = 1, sessiontoken = SessionToken}};
 
 init(A) ->
     lager:info("A ~p ", [A]).
@@ -122,7 +117,6 @@ send_msg(#task{newque = Que} = State) ->
     dgiot_dashboard:do_task(Task, State),
     NewQue = lists:nthtail(1, Que),
     erlang:send_after(3 * 1000, self(), retry),
-    lager:info("Que ~p", [Que]),
     State#task{newque = NewQue}.
 
 
