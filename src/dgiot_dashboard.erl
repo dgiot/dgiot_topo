@@ -30,8 +30,10 @@ do_task(#{<<"dataType">> := <<"map">>, <<"vuekey">> := Vuekey, <<"table">> := Ta
             NewResult =
                 lists:foldl(fun(X, Acc) ->
                     case X of
-                        #{<<"objectId">> := ObjectId, <<"name">> := Name, <<"location">> := #{<<"latitude">> := Latitude, <<"longitude">> := Longitude}} ->
-                            Acc ++ [#{<<"objectid">> => ObjectId, <<"name">> => Name, <<"location">> => #{<<"longitude">> => Longitude, <<"latitude">> => Latitude}}];
+                        #{<<"objectId">> := ObjectId, <<"name">> := Name, <<"status">> := <<"ONLINE">>, <<"location">> := #{<<"latitude">> := Latitude, <<"longitude">> := Longitude}} ->
+                            Acc ++ [#{<<"objectId">> => ObjectId, <<"name">> => Name, <<"icon">> => <<"1">>, <<"location">> => #{<<"latitude">> => Latitude, <<"longitude">> => Longitude}}];
+                        #{<<"objectId">> := ObjectId, <<"name">> := Name, <<"status">> := <<"OFFLINE">>, <<"location">> := #{<<"latitude">> := Latitude, <<"longitude">> := Longitude}} ->
+                            Acc ++ [#{<<"objectId">> => ObjectId, <<"name">> => Name, <<"icon">> => <<"2">>, <<"location">> => #{<<"latitude">> => Latitude, <<"longitude">> => Longitude}}];
                         _ ->
                             Acc
                     end
@@ -61,6 +63,24 @@ do_task(#{<<"dataType">> := <<"card">>, <<"vuekey">> := Vuekey, <<"table">> := T
                                     end, [], Results),
                     Topic = <<"dashboard/", SessionToken/binary, "/post">>,
                     Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"vuekey">> => Vuekey, <<"table">> => Table, <<"value">> => #{<<"count">> => Count, <<"results">> => Products}})),
+                    shuwa_mqtt:publish(self(), Topic, Base64);
+                <<"ChartStatus">> ->
+                    OnlineCount =
+                        case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"count(*)">>], <<"where">> => #{<<"status">> => <<"ONLINE">>}}, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+                            {ok, #{<<"count">> := OnlineCount1}} ->
+                                OnlineCount1;
+                            _ ->
+                                0
+                        end,
+                    OfflineCount =
+                        case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"count(*)">>], <<"where">> => #{<<"status">> => <<"OFFLINE">>}}, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+                            {ok, #{<<"count">> := OfflineCount2}} ->
+                                OfflineCount2;
+                            _ ->
+                                0
+                        end,
+                    Topic = <<"dashboard/", SessionToken/binary, "/post">>,
+                    Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"vuekey">> => Vuekey, <<"table">> => Table, <<"value">> => #{<<"chartData">> => #{<<"columns">> => [<<"状态"/utf8>>, <<"数量"/utf8>>], <<"rows">> => [#{<<"状态"/utf8>> => <<"在线"/utf8>>, <<"数量"/utf8>> => OnlineCount}, #{<<"状态"/utf8>> => <<"离线"/utf8>>, <<"数量"/utf8>> => OfflineCount}]}}})),
                     shuwa_mqtt:publish(self(), Topic, Base64);
                 _ ->
                     Topic = <<"dashboard/", SessionToken/binary, "/post">>,
