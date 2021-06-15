@@ -24,8 +24,8 @@ post_dashboard(Args, #{<<"sessionToken">> := SessionToken} = _Context) ->
 %%182,229,153,168,49,50,51,52,...>>,
 %%<<"objectId">> => <<"5c413c7040">>,
 
-do_task(#{<<"dataType">> := <<"map">>, <<"id">> := Id, <<"key">> := Key} = Task, #task{sessiontoken = SessionToken}) ->
-    case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"name">>, <<"location">>], <<"limit">> => 100}) of
+do_task(#{<<"dataType">> := <<"map">>, <<"vuekey">> := Vuekey, <<"table">> := Table, <<"query">> := Query}, #task{sessiontoken = SessionToken}) ->
+    case shuwa_parse:query_object(<<"Device">>, Query, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
         {ok, #{<<"results">> := Results}} ->
             NewResult =
                 lists:foldl(fun(X, Acc) ->
@@ -37,38 +37,34 @@ do_task(#{<<"dataType">> := <<"map">>, <<"id">> := Id, <<"key">> := Key} = Task,
                     end
                             end, [], Results),
             Topic = <<"dashboard/", SessionToken/binary, "/post">>,
-            Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"map">>, <<"id">> => Id, <<"key">> => Key, <<"value">> => NewResult})),
+            Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"map">>, <<"vuekey">> => Vuekey, <<"table">> => Table, <<"value">> => NewResult})),
             shuwa_mqtt:publish(self(), Topic, Base64);
         _ ->
             pass
     end;
 
-do_task(#{<<"dataType">> := <<"card">>, <<"id">> := Id, <<"key">> := Key, <<"query">> := #{<<"keys">> := Keys, <<"where">> := Where}}, #task{sessiontoken = SessionToken}) ->
-    case shuwa_parse:query_object(Key, #{<<"keys">> => Keys ++ [<<"objectId">>], <<"where">> => Where, <<"limit">> => 1}) of
-        {ok, #{<<"count">> := Count, <<"results">> := Results}} ->
-            case Key of
+%% shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"count(*)">>],<<"order">> => <<"-updatedAt">>, <<"limit">> => 10, <<"skip">> => 0}, [{"X-Parse-Session-Token", <<"r:3bcb41395765d5affefd549a0bcc6f0f">>}], [{from, rest}])
+do_task(#{<<"dataType">> := <<"card">>, <<"vuekey">> := Vuekey, <<"table">> := Table, <<"query">> := Query}, #task{sessiontoken = SessionToken}) ->
+    case shuwa_parse:query_object(Table, Query, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+        {ok, #{<<"count">> := Count, <<"results">> := Results} = NewResults} ->
+            case Table of
                 <<"Product">> ->
                     Products =
                         lists:foldl(fun(X, Acc) ->
                             case X of
                                 #{<<"objectId">> := ObjectId} ->
-                                    UpdatedAt = maps:get(<<"updatedAt">>, X, <<>>),
-                                    Name = maps:get(<<"name">>, X, <<>>),
-                                    Category = maps:get(<<"category">>, X, <<>>),
-                                    Desc = maps:get(<<"desc">>, X, <<>>),
-                                    Icon = maps:get(<<"icon">>, X, <<>>),
-                                    DeviceChild = getDevice(ObjectId),
-                                    Acc ++ [#{<<"objectid">> => ObjectId, <<"name">> => Name, <<"updatedAt">> => UpdatedAt, <<"category">> => Category, <<"desc">> => Desc, <<"icon">> => Icon, <<"deviceChild">> => DeviceChild}];
+                                    DeviceChild = getDevice(ObjectId, SessionToken),
+                                    Acc ++ [X#{<<"deviceChild">> => DeviceChild}];
                                 _ ->
                                     Acc
                             end
                                     end, [], Results),
                     Topic = <<"dashboard/", SessionToken/binary, "/post">>,
-                    Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"id">> => Id, <<"key">> => Key, <<"value">> => #{<<"count">> => Count, <<"results">> => Products}})),
+                    Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"vuekey">> => Vuekey, <<"table">> => Table, <<"value">> => #{<<"count">> => Count, <<"results">> => Products}})),
                     shuwa_mqtt:publish(self(), Topic, Base64);
                 _ ->
                     Topic = <<"dashboard/", SessionToken/binary, "/post">>,
-                    Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"id">> => Id, <<"key">> => Key, <<"value">> => Count})),
+                    Base64 = base64:encode(jsx:encode(#{<<"dataType">> => <<"card">>, <<"vuekey">> => Vuekey, <<"table">> => Table, <<"value">> => NewResults})),
                     shuwa_mqtt:publish(self(), Topic, Base64)
             end;
         _ ->
@@ -80,9 +76,23 @@ do_task(Task, State) ->
     lager:info("State ~p", [State]),
     ok.
 
-getDevice(ProductId) ->
-    shuwa_parse:query_object(<<"Device">>, #{<<"limit">> => 1, <<"where">> => #{<<"product">> => <<"30a01ed480">>}}),
-    case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"name">>], <<"where">> => #{<<"product">> => ProductId}, <<"limit">> => 100}) of
+getDevice(<<"all">>, SessionToken) ->
+    case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"count(*)">>], <<"limit">> => 10}, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+        {ok, #{<<"results">> := Results}} ->
+            lists:foldl(fun(X, Acc) ->
+                case X of
+                    #{<<"objectId">> := ObjectId, <<"name">> := Name} ->
+                        Acc ++ [#{<<"objectid">> => ObjectId, <<"name">> => Name}];
+                    _ ->
+                        Acc
+                end
+                        end, [], Results);
+        _ ->
+            []
+    end;
+
+getDevice(ProductId, SessionToken) ->
+    case shuwa_parse:query_object(<<"Device">>, #{<<"keys">> => [<<"count(*)">>], <<"where">> => #{<<"product">> => ProductId}, <<"limit">> => 10}, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
         {ok, #{<<"results">> := Results}} ->
             lists:foldl(fun(X, Acc) ->
                 case X of
