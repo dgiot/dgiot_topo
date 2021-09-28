@@ -50,23 +50,19 @@ handle(OperationID, Args, Context, Req) ->
     Headers = #{},
     case catch do_request(OperationID, Args, Context, Req) of
         {ErrType, Reason} when ErrType == 'EXIT'; ErrType == error ->
-            ?LOG(info,"do request: ~p, ~p, ~p~n", [OperationID, Args, Reason]),
+            ?LOG(info, "do request: ~p, ~p, ~p~n", [OperationID, Args, Reason]),
             Err = case is_binary(Reason) of
                       true -> Reason;
-                      false -> dgiot_framework:format("~p", [Reason])
+                      false -> dgiot_utils:format("~p", [Reason])
                   end,
             {500, Headers, #{<<"error">> => Err}};
         ok ->
-            lager:debug("do request: ~p, ~p ->ok ~n", [OperationID, Args]),
             {200, Headers, #{}, Req};
         {ok, Res} ->
-            ?LOG(info,"do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),
             {200, Headers, Res, Req};
         {Status, Res} ->
-            ?LOG(info,"do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),
             {Status, Headers, Res, Req};
         {Status, NewHeaders, Res} ->
-            ?LOG(info,"do request: ~p, ~p ->~p~n", [OperationID, Args, Res]),
             {Status, maps:merge(Headers, NewHeaders), Res, Req}
     end.
 
@@ -75,7 +71,7 @@ handle(OperationID, Args, Context, Req) ->
 %%% 内部函数 Version:API版本
 %%%===================================================================
 
-%% topo 概要: 组态
+%% topo 概要: 获取组态
 %% OperationId:topo
 %% 请求:GET topo
 do_request(get_topo, Arg, Context, _Req) ->
@@ -87,11 +83,10 @@ do_request(get_topo, Arg, Context, _Req) ->
     end;
 
 
-%% topo 概要: 组态
+%% topo 概要: 发送组态数据
 %% OperationId:topo
 %% 请求:post post_send_topo
-do_request(post_send_topo, Arg, Context, _Req) ->
-    ?LOG(info,"Arg ~p", [Arg]),
+do_request(post_topo, Arg, Context, _Req) ->
     case dgiot_topo:put_topo(Arg, Context) of
         {ok, Success} ->
             {ok, Success};
@@ -99,6 +94,49 @@ do_request(post_send_topo, Arg, Context, _Req) ->
             {400, Reason}
     end;
 
+%% topo 概要: 获取组态物模型详情
+%% OperationId:topo
+%% 请求:post get_konva_thing
+do_request(get_konva_thing, Arg, Context, _Req) ->
+    case dgiot_topo:get_konva_thing(Arg, Context) of
+        {ok, Success} ->
+            {ok, Success};
+        {error, Reason} ->
+            {400, Reason}
+    end;
+
+%% topo 概要: 修改组态
+%% OperationId:topo
+%% 请求:post post_send_topo
+do_request(post_konva_thing, Arg, Context, _Req) ->
+    case dgiot_topo:edit_konva(Arg, Context) of
+        {ok, Success} ->
+            {ok, Success};
+        {error, Reason} ->
+            {400, Reason}
+    end;
+
+do_request(post_dashboard, Arg, Context, _Req) ->
+    dgiot_dashboard:post_dashboard(Arg, Context),
+    {200, <<"success">>};
+
+do_request(get_devicedict, #{<<"deviceid">> := Deviceid}, #{<<"sessionToken">> := SessionToken} = _Context, _Req) ->
+%%    case dgiot_parse:get_object(<<"Device">>, <<"566cf263dc">>, [{"X-Parse-Session-Token", <<"r:e53794ae4bb367b13f73ddd5891e2755">>}], [{from, rest}]) of
+    case dgiot_parse:get_object(<<"Device">>, Deviceid, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+        {ok, #{<<"basedata">> := #{<<"deviceDict">> := DeviceDict}}} ->
+            {ok, DeviceDict};
+        _ ->
+            {error, []}
+    end;
+
+%% 查询设备所拥有权限
+do_request(get_deviceacl, #{<<"deviceid">> := Deviceid}, #{<<"sessionToken">> := SessionToken} = _Context, _Req) ->
+    case dgiot_parse:get_object(<<"Device">>, Deviceid, [{"X-Parse-Session-Token", SessionToken}], [{from, rest}]) of
+        {ok, #{<<"ACL">> := ACL}} ->
+            {ok, ACL};
+        _ ->
+            {error, []}
+    end;
 
 %%  服务器不支持的API接口
 do_request(_OperationId, _Args, _Context, _Req) ->
